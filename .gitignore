@@ -1,0 +1,38 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# ==============================
+# Archivos de audio/video grandes
+# ==============================
+*.wav
+*.mp3
+*.mp4
+*.m4a
+*.flac
+*.ogg
+*.aac
+*.mkv
+*.avi
+
+# Carpeta de tests y salidas del procesamiento
+test/
+output/
+
+# Modelos de ML (archivos pesados)
+*.pt
+*.pth
+*.ckpt
+
+# IDE / Sistema
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
