@@ -1,0 +1,19 @@
+{
+  "name": "auth-sistema",
+  "version": "1.0.0",
+  "description": "Sistema de Login y Registro — German Gonzalez",
+  "main": "servidor.js",
+  "scripts": {
+    "start": "node servidor.js",
+    "dev": "node servidor.js"
+  },
+  "keywords": [
+    "php",
+    "laravel",
+    "auth",
+    "login",
+    "registro"
+  ],
+  "author": "German Gonzalez",
+  "license": "MIT"
+}
