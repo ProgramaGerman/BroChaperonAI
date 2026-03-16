@@ -1,5 +1,6 @@
 # =============================================================================
 # test_suite.py — Pruebas unitarias para AIEngine e ImageProcessor
+# [Revisor - Equipo Alejabot] Añadidos: TestNewModes (rompehielo + modo_amigos)
 # Ejecutar: python -m pytest tests/test_suite.py -v
 #       o:  python -m unittest tests/test_suite.py -v
 # =============================================================================
@@ -75,12 +76,12 @@ class TestAIEngine(unittest.TestCase):
 
     # --- test_missing_key (15) ---
     def test_missing_key(self) -> None:
-        """Debe lanzar EnvironmentError si OPENROUTER_API_KEY no está definida."""
-        with patch.dict(os.environ, {}, clear=True):
-            os.environ.pop("OPENROUTER_API_KEY", None)
-            from importlib import reload
-            import app.models.ai_engine as eng_mod
-            reload(eng_mod)   # forzar recarga sin variable
+        """AIEngine debe lanzar EnvironmentError si la key está vacía."""
+        import sys
+        sys.modules.pop("app.models.ai_engine", None)
+        with patch.dict(os.environ, {"OPENROUTER_API_KEY": ""}, clear=False):
+            from importlib import import_module
+            eng_mod = import_module("app.models.ai_engine")
             with self.assertRaises(EnvironmentError):
                 eng_mod.AIEngine()
 
@@ -111,6 +112,53 @@ class TestAIEngine(unittest.TestCase):
             self.assertIn("messages",   payload)
             self.assertIn("max_tokens", payload)
             self.assertTrue(len(payload["messages"]) >= 2)
+
+
+# ===========================================================================
+# TestNewModes — [Revisor] Verifica los arquetipos nuevos v2.0
+# ===========================================================================
+
+class TestNewModes(unittest.TestCase):
+    """Pruebas para los modos rompehielo y modo_amigos."""
+
+    def _get_engine(self):
+        with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}):
+            from importlib import reload
+            import app.models.ai_engine as eng_mod
+            reload(eng_mod)
+            return eng_mod.AIEngine(), eng_mod.ARCHEYPES
+
+    # --- test_rompehielo_exists (22) ---
+    def test_rompehielo_exists(self) -> None:
+        """El arquetipo 'rompehielo' debe existir en ARCHEYPES."""
+        engine, ARCHEYPES = self._get_engine()
+        self.assertIn("rompehielo", ARCHEYPES)
+        self.assertIn("primera", ARCHEYPES["rompehielo"].lower())
+
+    # --- test_modo_amigos_exists (23) ---
+    def test_modo_amigos_exists(self) -> None:
+        """El arquetipo 'modo_amigos' debe existir en ARCHEYPES."""
+        engine, ARCHEYPES = self._get_engine()
+        self.assertIn("modo_amigos", ARCHEYPES)
+        self.assertIn("amigo", ARCHEYPES["modo_amigos"].lower())
+
+    # --- test_new_modes_payload (24) ---
+    def test_new_modes_payload(self) -> None:
+        """Los nuevos modos deben generar payloads válidos."""
+        engine, _ = self._get_engine()
+        img = _make_rgb_image()
+        for mode in ("rompehielo", "modo_amigos"):
+            payload = engine._build_payload(img, mode)
+            self.assertIn("model", payload)
+            self.assertIn("messages", payload)
+            sys_msg = payload["messages"][0]
+            self.assertEqual(sys_msg["role"], "system")
+
+    # --- test_total_modes_count (25) ---
+    def test_total_modes_count(self) -> None:
+        """Deben existir exactamente 6 modos en ARCHEYPES."""
+        _, ARCHEYPES = self._get_engine()
+        self.assertEqual(len(ARCHEYPES), 6)
 
 
 if __name__ == "__main__":

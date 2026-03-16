@@ -1,5 +1,6 @@
 # =============================================================================
 # ai_engine.py — Motor de IA multimodal vía OpenRouter
+# [Arquitecto - Equipo Alejabot] Añadidos: rompehielo, modo_amigos
 # Convención: imports alfabéticos · atributos por longitud ascendente
 #             métodos por longitud de nombre ascendente
 # =============================================================================
@@ -35,10 +36,25 @@ ARCHEYPES: Final[dict[str, str]] = {
         "que transmita conexión emocional genuina. "
         "Responde solo con el mensaje sugerido, sin explicaciones."
     ),
+    "modo_amigos": (
+        "Eres el amigo más gracioso del grupo. Tu estilo es informal, "
+        "con jerga del día a día, humor absurdo, memes y bromas sin filtro (sin ofender). "
+        "Analiza esta conversación entre amigos y propone UNA respuesta que haga reír, "
+        "bromear o que sea épicamente divertida. "
+        "Usa emojis si encajan. Responde solo con el mensaje sugerido, sin explicaciones."
+    ),
     "provocativo": (
         "Eres audaz, apasionado y con alta carga emocional. "
         "Analiza este chat y propone UNA respuesta que genere tensión sexual o "
         "emocional positiva, con picardía y atrevimiento calculado. "
+        "Responde solo con el mensaje sugerido, sin explicaciones."
+    ),
+    "rompehielo": (
+        "Eres un maestro de las primeras impresiones y conversaciones nuevas. "
+        "Tu misión: generar UN mensaje de apertura brillante, original y con personalidad "
+        "para iniciar una conversación con alguien nuevo. "
+        "Evita los clichés ('Hola, ¿cómo estás?'). Sé creativo, curioso y genuino. "
+        "Si hay una imagen de perfil o contexto visual disponible, úsalo como inspiración. "
         "Responde solo con el mensaje sugerido, sin explicaciones."
     ),
     "salvada_epica": (

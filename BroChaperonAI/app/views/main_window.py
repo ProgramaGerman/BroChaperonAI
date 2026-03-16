@@ -1,6 +1,6 @@
 # =============================================================================
-# main_window.py — Vista principal rediseñada (estilo COUPLA AI)
-# CustomTkinter dark premium · lógica intacta del presentador
+# main_window.py — Vista principal BroChaperonAI (Rediseño Equipo Alejabot)
+# [Especialista-Frontend] Layout 2 col · Panel resoluciones · 6 modos · Texto visible
 # Convención: imports alfabéticos · atributos por longitud ascendente
 #             métodos por longitud de nombre ascendente
 # =============================================================================
@@ -16,24 +16,38 @@ if TYPE_CHECKING:
     from app.presenters.chat_presenter import ChatPresenter
 
 # ---------------------------------------------------------------------------
-# Paleta de colores (inspirada en el mockup)
+# Paleta de colores — más visible y contrastada
 # ---------------------------------------------------------------------------
-BG_ROOT:    str = "#09090F"   # negro puro del fondo
-BG_CARD:    str = "#111118"   # tarjetas ligeramente más claras
-BG_CARD2:   str = "#0D0D14"   # zona de respuesta / upload
-BORDER_OFF: str = "#1E1E2E"   # borde inactivo
-BORDER_ON:  str = "#7C3AED"   # borde activo / seleccionado (púrpura)
-TXT_MAIN:   str = "#E8E8F0"   # texto principal
-TXT_DIM:    str = "#42425A"   # texto tenue (subtítulos, footer)
-TXT_MID:    str = "#8888A8"   # texto medio (labels de botones)
-WHITE:      str = "#FFFFFF"
+BG_ROOT:     str = "#09090F"   # negro puro del fondo
+BG_CARD:     str = "#111118"   # tarjetas ligeramente más claras
+BG_CARD2:    str = "#0D0D16"   # zona de respuesta / upload
+BG_SIDEBAR:  str = "#0F0F1A"   # fondo del panel lateral
+BORDER_OFF:  str = "#252538"   # borde inactivo (más visible que antes)
+BORDER_ON:   str = "#7C3AED"   # borde activo / seleccionado (púrpura)
+ACCENT_DIM:  str = "#5B21B6"   # hover modos activos
+TXT_MAIN:    str = "#F0F0FF"   # texto principal (más brillante)
+TXT_MID:     str = "#AAAACC"   # texto medio — labels de botones (más claro)
+TXT_DIM:     str = "#666680"   # texto tenue (subtítulos, footer)
+TXT_SECTION: str = "#8888BB"   # títulos de sección
+WHITE:       str = "#FFFFFF"
 
-# Ícono unicode por modo (sustituye SVG)
+# Resoluciones disponibles (ancho, alto) con etiqueta
+RESOLUTIONS: list[tuple[str, int, int]] = [
+    ("1280×720  HD",       1280, 720),
+    ("1366×768  HD+",      1366, 768),
+    ("1920×1080  Full HD", 1920, 1080),
+    ("1600×900  HD+",      1600, 900),
+]
+DEFAULT_RES_IDX: int = 2   # Full HD seleccionado por defecto
+
+# Ícono unicode por modo
 MODE_ICONS: dict[str, str] = {
     "provocativo":   "🔥",
     "enamorar":      "💕",
     "salvada_epica": "⚡",
     "coquetear":     "😏",
+    "rompehielo":    "🧊",
+    "modo_amigos":   "👥",
 }
 
 MODE_LABELS: dict[str, str] = {
@@ -41,7 +55,13 @@ MODE_LABELS: dict[str, str] = {
     "enamorar":      "ENAMORAR",
     "salvada_epica": "SALVADA ÉPICA",
     "coquetear":     "COQUETEAR",
+    "rompehielo":    "ROMPEHIELO",
+    "modo_amigos":   "MODO AMIGOS",
 }
+
+# Agrupación de modos por sección
+MODES_ROW1: list[str] = ["provocativo", "enamorar", "salvada_epica", "coquetear"]
+MODES_ROW2: list[str] = ["rompehielo", "modo_amigos"]
 
 
 # ---------------------------------------------------------------------------
@@ -52,18 +72,12 @@ class _BorderCard(ctk.CTkFrame):
     """Frame con borde de 1 px usando un frame exterior como borde."""
 
     def __init__(self, master, border_color: str = BORDER_OFF, **kwargs):
-        # Frame exterior = borde
-        super().__init__(
-            master,
-            fg_color=border_color,
-            corner_radius=kwargs.pop("corner_radius", 14),
-        )
-        # Frame interior = contenido
-        cr = kwargs.pop("corner_radius", 13)
+        cr_outer = kwargs.pop("corner_radius", 14)
+        super().__init__(master, fg_color=border_color, corner_radius=cr_outer)
         self._inner = ctk.CTkFrame(
             self,
             fg_color=kwargs.pop("fg_color", BG_CARD),
-            corner_radius=cr,
+            corner_radius=cr_outer - 1,
             **kwargs,
         )
         self._inner.pack(fill="both", expand=True, padx=1, pady=1)
@@ -80,57 +94,52 @@ class _BorderCard(ctk.CTkFrame):
 # ===========================================================================
 
 class MainWindow(ctk.CTk):
-    """Vista principal de BroChaperonAI — estilo COUPLA AI."""
+    """Vista principal de BroChaperonAI — Rediseño Equipo Alejabot."""
 
     def __init__(self) -> None:
         super().__init__()
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("dark-blue")
 
-        # Atributos por longitud ascendente
-        self._ctk_img: ctk.CTkImage | None      = None
-        self.presenter: "ChatPresenter | None"   = None
-        self._active_mode: str | None            = None
-        self._mode_cards: dict[str, _BorderCard] = {}
+        self._ctk_img: ctk.CTkImage | None          = None
+        self.presenter: "ChatPresenter | None"       = None
+        self._active_mode: str | None                = None
+        self._active_res_idx: int                    = DEFAULT_RES_IDX
+        self._mode_cards: dict[str, _BorderCard]     = {}
+        self._res_cards: list[_BorderCard]           = []
 
         self._build_window()
-        self._build_header()
-        self._build_upload_zone()
-        self._build_mode_buttons()
-        self._build_response_area()
-        self._build_copy_button()
-        self._build_footer()
+        self._build_layout()
 
-    # --- set_presenter (13) ------------------------------------------------
+    # --- set_presenter ---------------------------------------------------
     def set_presenter(self, presenter: "ChatPresenter") -> None:
         self.presenter = presenter
 
-    # --- show_error (10) ---------------------------------------------------
+    # --- show_error ------------------------------------------------------
     def show_error(self, msg: str) -> None:
         messagebox.showerror("BroChaperonAI", msg, parent=self)
 
-    # --- set_status (10) ---------------------------------------------------
+    # --- set_status ------------------------------------------------------
     def set_status(self, text: str) -> None:
         self._status_var.set(text)
 
-    # --- show_preview (12) -------------------------------------------------
+    # --- show_preview ----------------------------------------------------
     def show_preview(self, image: Image.Image) -> None:
-        """Reemplaza el ícono de carga con la miniatura de la imagen."""
         self._ctk_img = ctk.CTkImage(
-            light_image=image, dark_image=image, size=(72, 72)
+            light_image=image, dark_image=image, size=(68, 68)
         )
         self._upload_icon_lbl.configure(image=self._ctk_img, text="")
-        self._upload_title.configure(text="P A N T A L L A Z O   C A R G A D O")
-        self._upload_sub.configure(text="M O T O R   D E   A N Á L I S I S   L I S T O  ·")
+        self._upload_title.configure(text="PANTALLAZO CARGADO ✓")
+        self._upload_sub.configure(text="Motor de análisis listo")
 
-    # --- show_response (13) ------------------------------------------------
+    # --- show_response ---------------------------------------------------
     def show_response(self, text: str) -> None:
         self._response_box.configure(state="normal")
         self._response_box.delete("1.0", "end")
         self._response_box.insert("1.0", f'"{text}"')
         self._response_box.configure(state="disabled")
 
-    # --- set_loading (11) --------------------------------------------------
+    # --- set_loading -----------------------------------------------------
     def set_loading(self, active: bool) -> None:
         if active:
             self._progress.pack(pady=(0, 6))
@@ -140,64 +149,89 @@ class MainWindow(ctk.CTk):
             self._progress.pack_forget()
         self._set_modes_state("disabled" if active else "normal")
 
-    # ---- builders privados ------------------------------------------------
+    # =========================================================================
+    # Builders — estructura de 2 columnas
+    # =========================================================================
 
     def _build_window(self) -> None:
+        w, h = RESOLUTIONS[DEFAULT_RES_IDX][1], RESOLUTIONS[DEFAULT_RES_IDX][2]
         self.title("BroChaperonAI")
-        self.geometry("740x820")
-        self.minsize(620, 720)
+        self.geometry(f"{w}x{h}")
+        self.minsize(900, 680)
         self.configure(fg_color=BG_ROOT)
+        # 2 columnas: col 0 = contenido principal (flex), col 1 = sidebar fijo
         self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0, minsize=240)
+        self.grid_rowconfigure(0, weight=1)
 
-    def _build_header(self) -> None:
-        """Franja superior: orbe + título BroChaperonAI."""
-        hdr = ctk.CTkFrame(self, fg_color=BG_ROOT, height=64)
-        hdr.grid(row=0, column=0, sticky="ew", padx=0, pady=(20, 0))
+    def _build_layout(self) -> None:
+        """Crea el frame izquierdo (principal) y el panel derecho (sidebar)."""
+        # ----- Panel izquierdo -----
+        self._left = ctk.CTkFrame(self, fg_color=BG_ROOT)
+        self._left.grid(row=0, column=0, sticky="nsew", padx=(16, 8), pady=16)
+        self._left.grid_columnconfigure(0, weight=1)
+        self._left.grid_rowconfigure(3, weight=1)   # fila respuesta crece
+
+        self._build_header(self._left)
+        self._build_upload_zone(self._left)
+        self._build_mode_buttons(self._left)
+        self._build_response_area(self._left)
+        self._build_copy_button(self._left)
+        self._build_footer(self._left)
+
+        # ----- Panel derecho (sidebar) -----
+        self._right = ctk.CTkFrame(
+            self, fg_color=BG_SIDEBAR,
+            corner_radius=16,
+        )
+        self._right.grid(row=0, column=1, sticky="nsew", padx=(0, 16), pady=16)
+        self._right.grid_columnconfigure(0, weight=1)
+        self._build_sidebar(self._right)
+
+    # ---- Header -------------------------------------------------------
+    def _build_header(self, parent) -> None:
+        hdr = ctk.CTkFrame(parent, fg_color="transparent", height=54)
+        hdr.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         hdr.grid_columnconfigure(0, weight=1)
 
-        # Contenedor centrado
         inner = ctk.CTkFrame(hdr, fg_color="transparent")
         inner.grid(row=0, column=0)
 
-        # Orbe (círculo con gradiente simulado — emoji de esfera)
-        orb = ctk.CTkLabel(
+        ctk.CTkLabel(
             inner, text="⬤",
             font=ctk.CTkFont("Segoe UI", 18),
             text_color="#8B5CF6",
-        )
-        orb.pack(side="left", padx=(0, 10))
+        ).pack(side="left", padx=(0, 10))
 
         ctk.CTkLabel(
             inner,
-            text="B R O C H A P E R O N   A I",
-            font=ctk.CTkFont("Segoe UI", 15, "bold"),
+            text="BRO CHAPERON  AI",
+            font=ctk.CTkFont("Segoe UI", 17, "bold"),
             text_color=TXT_MAIN,
         ).pack(side="left")
 
-    def _build_upload_zone(self) -> None:
-        """Zona de carga centrada con ícono de cámara."""
-        card = _BorderCard(self, border_color=BORDER_OFF, corner_radius=18)
-        card.grid(row=1, column=0, sticky="ew", padx=80, pady=(28, 0))
+    # ---- Upload zone ---------------------------------------------------
+    def _build_upload_zone(self, parent) -> None:
+        card = _BorderCard(parent, border_color=BORDER_OFF, corner_radius=16)
+        card.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         inner = card.inner()
         inner.configure(fg_color=BG_CARD2, cursor="hand2")
 
-        # Click en toda la tarjeta
         for w in (inner, card):
             w.bind("<Button-1>", lambda e: self._on_load_click())
 
-        # Ícono cámara (texto unicode grande)
         self._upload_icon_lbl = ctk.CTkLabel(
             inner, text="📷",
-            font=ctk.CTkFont("Segoe UI", 42),
+            font=ctk.CTkFont("Segoe UI", 38),
             text_color=TXT_MID,
         )
-        self._upload_icon_lbl.pack(pady=(28, 4))
+        self._upload_icon_lbl.pack(pady=(20, 4))
         self._upload_icon_lbl.bind("<Button-1>", lambda e: self._on_load_click())
 
         self._upload_title = ctk.CTkLabel(
             inner,
-            text="C A R G A R   P A N T A L L A Z O",
-            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            text="CARGAR PANTALLAZO",
+            font=ctk.CTkFont("Segoe UI", 14, "bold"),
             text_color=TXT_MAIN,
         )
         self._upload_title.pack()
@@ -205,62 +239,89 @@ class MainWindow(ctk.CTk):
 
         self._upload_sub = ctk.CTkLabel(
             inner,
-            text="M O T O R   D E   A N Á L I S I S   L I S T O  ·",
-            font=ctk.CTkFont("Segoe UI", 9),
-            text_color=TXT_DIM,
+            text="Haz clic para seleccionar tu captura de pantalla",
+            font=ctk.CTkFont("Segoe UI", 10),
+            text_color=TXT_MID,
         )
-        self._upload_sub.pack(pady=(2, 24))
+        self._upload_sub.pack(pady=(3, 18))
         self._upload_sub.bind("<Button-1>", lambda e: self._on_load_click())
 
-        # Progress bar (oculto por defecto)
         self._progress = ctk.CTkProgressBar(
             inner, mode="indeterminate",
-            progress_color=BORDER_ON, height=2, width=320,
+            progress_color=BORDER_ON, height=2, width=280,
         )
 
-    def _build_mode_buttons(self) -> None:
-        """Cuatro tarjetas cuadradas en fila horizontal."""
-        row_frame = ctk.CTkFrame(self, fg_color="transparent")
-        row_frame.grid(row=2, column=0, sticky="ew", padx=80, pady=(18, 0))
-        row_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+    # ---- Mode buttons --------------------------------------------------
+    def _build_mode_buttons(self, parent) -> None:
+        container = ctk.CTkFrame(parent, fg_color="transparent")
+        container.grid(row=2, column=0, sticky="ew", pady=(0, 10))
+        container.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        for col, (key, label) in enumerate(MODE_LABELS.items()):
-            card = _BorderCard(
-                row_frame,
-                border_color=BORDER_OFF,
-                corner_radius=14,
-            )
-            card.grid(row=0, column=col, padx=5, pady=0, sticky="nsew")
-            inner = card.inner()
-            inner.configure(fg_color=BG_CARD, cursor="hand2")
+        # Etiqueta de sección
+        self._build_section_label(container, "MODO DE RESPUESTA", col_span=4, row=0)
 
-            icon_lbl = ctk.CTkLabel(
-                inner,
-                text=MODE_ICONS[key],
-                font=ctk.CTkFont("Segoe UI", 22),
-                text_color=TXT_MID,
-            )
-            icon_lbl.pack(pady=(22, 6))
+        # — Fila 1: 4 modos románticos —
+        row1 = ctk.CTkFrame(container, fg_color="transparent")
+        row1.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(4, 4))
+        row1.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        for col, key in enumerate(MODES_ROW1):
+            self._build_mode_card(row1, key, col, 0)
 
-            lbl = ctk.CTkLabel(
-                inner,
-                text=label,
-                font=ctk.CTkFont("Segoe UI", 8, "bold"),
-                text_color=TXT_MID,
-            )
-            lbl.pack(pady=(0, 20))
+        # — Fila 2: 2 modos sociales (más anchos) —
+        row2 = ctk.CTkFrame(container, fg_color="transparent")
+        row2.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(0, 4))
+        row2.grid_columnconfigure((0, 1), weight=1)
+        for col, key in enumerate(MODES_ROW2):
+            self._build_mode_card(row2, key, col, 0, tall=False)
 
-            cb = self._make_mode_callback(key)
-            for widget in (card, inner, icon_lbl, lbl):
-                widget.bind("<Button-1>", lambda e, k=key: self._on_mode_click(k))
+    def _build_section_label(self, parent, text: str, col_span: int = 1, row: int = 0) -> None:
+        ctk.CTkLabel(
+            parent, text=text,
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            text_color=TXT_SECTION,
+        ).grid(row=row, column=0, columnspan=col_span, sticky="w", padx=4, pady=(4, 0))
 
-            self._mode_cards[key] = card
+    def _build_mode_card(self, parent, key: str, col: int, row: int, tall: bool = True) -> None:
+        card = _BorderCard(parent, border_color=BORDER_OFF, corner_radius=12)
+        card.grid(row=row, column=col, padx=4, pady=0, sticky="nsew")
+        inner = card.inner()
+        inner.configure(fg_color=BG_CARD, cursor="hand2")
 
-    def _build_response_area(self) -> None:
-        """Área de texto grande con respuesta en cursiva centrada."""
-        card = _BorderCard(self, border_color=BORDER_OFF, corner_radius=18)
-        card.grid(row=3, column=0, sticky="nsew", padx=80, pady=(18, 0))
-        self.grid_rowconfigure(3, weight=1)
+        icon_lbl = ctk.CTkLabel(
+            inner,
+            text=MODE_ICONS[key],
+            font=ctk.CTkFont("Segoe UI", 22),
+            text_color=TXT_MID,
+        )
+        icon_lbl.pack(pady=(16, 4) if tall else (12, 4))
+
+        lbl = ctk.CTkLabel(
+            inner,
+            text=MODE_LABELS[key],
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            text_color=TXT_MID,
+        )
+        lbl.pack(pady=(0, 14) if tall else (0, 12))
+
+        for widget in (card, inner, icon_lbl, lbl):
+            widget.bind("<Button-1>", lambda e, k=key: self._on_mode_click(k))
+
+        self._mode_cards[key] = card
+
+    # ---- Response area ------------------------------------------------
+    def _build_response_area(self, parent) -> None:
+        # Sección label
+        lbl_row = ctk.CTkFrame(parent, fg_color="transparent")
+        lbl_row.grid(row=3, column=0, sticky="ew")
+        ctk.CTkLabel(
+            lbl_row, text="RESPUESTA GENERADA",
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            text_color=TXT_SECTION,
+        ).pack(side="left", padx=4, pady=(4, 0))
+
+        card = _BorderCard(parent, border_color=BORDER_OFF, corner_radius=16)
+        card.grid(row=3, column=0, sticky="nsew", pady=(2, 0))
+        parent.grid_rowconfigure(3, weight=1)
         inner = card.inner()
         inner.configure(fg_color=BG_CARD2)
         inner.grid_rowconfigure(0, weight=1)
@@ -268,7 +329,7 @@ class MainWindow(ctk.CTk):
 
         self._response_box = ctk.CTkTextbox(
             inner,
-            font=ctk.CTkFont("Georgia", 15, slant="italic"),
+            font=ctk.CTkFont("Georgia", 14, slant="italic"),
             text_color=TXT_MAIN,
             fg_color="transparent",
             corner_radius=0,
@@ -276,56 +337,136 @@ class MainWindow(ctk.CTk):
             state="disabled",
             border_width=0,
         )
-        self._response_box.pack(fill="both", expand=True, padx=28, pady=28)
+        self._response_box.pack(fill="both", expand=True, padx=24, pady=24)
 
-    def _build_copy_button(self) -> None:
-        """Botón píldora blanco centrado."""
-        btn_frame = ctk.CTkFrame(self, fg_color=BG_ROOT)
-        btn_frame.grid(row=4, column=0, pady=(18, 6))
+    # ---- Copy button --------------------------------------------------
+    def _build_copy_button(self, parent) -> None:
+        btn_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        btn_frame.grid(row=4, column=0, pady=(12, 6))
 
         ctk.CTkButton(
             btn_frame,
-            text="📋  C O P I A R   R E S P U E S T A",
-            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text="📋  COPIAR RESPUESTA",
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
             text_color="#09090F",
             fg_color=WHITE,
             hover_color="#D4D4E8",
             corner_radius=50,
-            height=44,
-            width=280,
+            height=42,
+            width=260,
             command=self._on_copy_click,
         ).pack()
 
-    def _build_footer(self) -> None:
-        """Barra inferior con etiquetas tipo NEURAL ARCHITECTURE."""
-        foot = ctk.CTkFrame(self, fg_color=BG_ROOT, height=40)
-        foot.grid(row=5, column=0, sticky="ew", padx=0, pady=(4, 12))
+    # ---- Footer -------------------------------------------------------
+    def _build_footer(self, parent) -> None:
+        foot = ctk.CTkFrame(parent, fg_color="transparent", height=32)
+        foot.grid(row=5, column=0, sticky="ew", pady=(0, 4))
         foot.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(
-            foot, text="E X C E L E N C I A   E N   I N T E R A C C I Ó N   H U M A N A",
-            font=ctk.CTkFont("Segoe UI", 7), text_color=TXT_DIM,
-        ).grid(row=0, column=0, padx=20, sticky="w")
-
-        # Centro: separadores + texto
-        mid = ctk.CTkFrame(foot, fg_color="transparent")
-        mid.grid(row=0, column=1)
-        ctk.CTkLabel(
-            mid,
-            text="—————  A R Q U I T E C T U R A   N E U R A L  —————",
-            font=ctk.CTkFont("Segoe UI", 7),
-            text_color=TXT_DIM,
-        ).pack()
-
-        ctk.CTkLabel(
-            foot, text="P R O T O C O L O",
-            font=ctk.CTkFont("Segoe UI", 7), text_color=TXT_DIM,
-        ).grid(row=0, column=2, padx=20, sticky="e")
-
-        # Barra de estado interna (invisible al usuario, solo para debug)
         self._status_var = tk.StringVar(value="")
+        ctk.CTkLabel(
+            foot,
+            textvariable=self._status_var,
+            font=ctk.CTkFont("Segoe UI", 9),
+            text_color=TXT_DIM,
+        ).grid(row=0, column=0, padx=4, sticky="w")
 
-    # ---- callbacks --------------------------------------------------------
+        ctk.CTkLabel(
+            foot, text="BroChaperonAI  ·  Equipo Alejabot  ·  v2.0",
+            font=ctk.CTkFont("Segoe UI", 8),
+            text_color=TXT_DIM,
+        ).grid(row=0, column=2, padx=4, sticky="e")
+
+    # =========================================================================
+    # Sidebar derecho — Panel de configuración
+    # =========================================================================
+
+    def _build_sidebar(self, parent) -> None:
+        # Título del panel
+        ctk.CTkLabel(
+            parent,
+            text="⚙️  CONFIG",
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            text_color="#9B6DFF",
+        ).pack(anchor="w", padx=16, pady=(20, 2))
+
+        # Separador
+        ctk.CTkFrame(parent, fg_color=BORDER_OFF, height=1).pack(fill="x", padx=12, pady=(4, 16))
+
+        # — Sección Resolución —
+        ctk.CTkLabel(
+            parent,
+            text="RESOLUCIÓN DE VENTANA",
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            text_color=TXT_SECTION,
+        ).pack(anchor="w", padx=16, pady=(0, 8))
+
+        for i, (label, w, h) in enumerate(RESOLUTIONS):
+            is_default = (i == DEFAULT_RES_IDX)
+            border_col = BORDER_ON if is_default else BORDER_OFF
+            card = _BorderCard(parent, border_color=border_col, corner_radius=10)
+            card.pack(fill="x", padx=12, pady=3)
+            inner = card.inner()
+            inner.configure(
+                fg_color="#1A1030" if is_default else BG_CARD,
+                cursor="hand2",
+            )
+
+            lbl = ctk.CTkLabel(
+                inner,
+                text=label,
+                font=ctk.CTkFont("Segoe UI", 10, "bold" if is_default else "normal"),
+                text_color=TXT_MAIN if is_default else TXT_MID,
+            )
+            lbl.pack(pady=10, padx=10, anchor="w")
+
+            for widget in (card, inner, lbl):
+                widget.bind("<Button-1>", lambda e, idx=i: self._on_res_click(idx))
+
+            self._res_cards.append(card)
+            card._inner_ref = inner   # guardar ref del inner para actualizar color
+
+        # Separador
+        ctk.CTkFrame(parent, fg_color=BORDER_OFF, height=1).pack(fill="x", padx=12, pady=(20, 16))
+
+        # — Info del modelo —
+        ctk.CTkLabel(
+            parent,
+            text="MODELO IA",
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            text_color=TXT_SECTION,
+        ).pack(anchor="w", padx=16, pady=(0, 4))
+
+        ctk.CTkLabel(
+            parent,
+            text="Qwen3-VL 30B\nMultimodal Vision",
+            font=ctk.CTkFont("Segoe UI", 10),
+            text_color=TXT_MID,
+            justify="left",
+        ).pack(anchor="w", padx=20, pady=(0, 12))
+
+        # — Estado del sistema —
+        ctk.CTkFrame(parent, fg_color=BORDER_OFF, height=1).pack(fill="x", padx=12, pady=(0, 16))
+
+        status_row = ctk.CTkFrame(parent, fg_color="transparent")
+        status_row.pack(fill="x", padx=16, pady=(0, 20))
+
+        ctk.CTkLabel(
+            status_row, text="●",
+            font=ctk.CTkFont("Segoe UI", 10),
+            text_color="#22C55E",
+        ).pack(side="left", padx=(0, 6))
+
+        ctk.CTkLabel(
+            status_row,
+            text="Sistema listo",
+            font=ctk.CTkFont("Segoe UI", 10),
+            text_color=TXT_MID,
+        ).pack(side="left")
+
+    # =========================================================================
+    # Callbacks
+    # =========================================================================
 
     def _on_load_click(self) -> None:
         path = filedialog.askopenfilename(
@@ -343,14 +484,38 @@ class MainWindow(ctk.CTk):
 
     def _on_mode_click(self, mode: str) -> None:
         """Resalta el modo activo y dispara la generación."""
-        # Quitar borde del anterior
         if self._active_mode and self._active_mode in self._mode_cards:
             self._mode_cards[self._active_mode].set_border(BORDER_OFF)
-        # Activar nuevo
         self._active_mode = mode
         self._mode_cards[mode].set_border(BORDER_ON)
         if self.presenter:
             self.presenter.on_generate(mode)
+
+    def _on_res_click(self, idx: int) -> None:
+        """Cambia la resolución de la ventana y resalta la card seleccionada."""
+        # Quitar selección anterior
+        prev = self._active_res_idx
+        if prev < len(self._res_cards):
+            self._res_cards[prev].set_border(BORDER_OFF)
+            inner = self._res_cards[prev]._inner_ref
+            inner.configure(fg_color=BG_CARD)
+            # Actualizar label del card anterior
+            for w in inner.winfo_children():
+                if isinstance(w, ctk.CTkLabel):
+                    w.configure(text_color=TXT_MID, font=ctk.CTkFont("Segoe UI", 10))
+
+        # Activar nuevo
+        self._active_res_idx = idx
+        self._res_cards[idx].set_border(BORDER_ON)
+        inner_new = self._res_cards[idx]._inner_ref
+        inner_new.configure(fg_color="#1A1030")
+        for w in inner_new.winfo_children():
+            if isinstance(w, ctk.CTkLabel):
+                w.configure(text_color=TXT_MAIN, font=ctk.CTkFont("Segoe UI", 10, "bold"))
+
+        # Aplicar resolución
+        _, w, h = RESOLUTIONS[idx]
+        self.geometry(f"{w}x{h}")
 
     def _make_mode_callback(self, mode: str) -> Callable[[], None]:
         return lambda: self._on_mode_click(mode)
